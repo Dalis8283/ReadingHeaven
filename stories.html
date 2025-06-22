@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Story Haven</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 0;
+      background: linear-gradient(to bottom right, #fff7ed, #ffedd5);
+      color: #333;
+    }
+    header, main, .card, .chapter, .chapter-view {
+      margin: 2rem auto;
+      max-width: 800px;
+      padding: 1.5rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #c2410c;
+    }
+    .story-list .card, .chapter {
+      cursor: pointer;
+      margin-bottom: 1rem;
+      transition: 0.2s ease;
+    }
+    .story-list .card:hover, .chapter:hover {
+      background: #fff7ed;
+    }
+    .badge {
+      display: inline-block;
+      background: #ffedd5;
+      color: #7c2d12;
+      font-size: 0.8rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 5px;
+      margin-right: 0.5rem;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      background: #f97316;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    button:hover {
+      background: #ea580c;
+    }
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.5rem;
+    }
+    .hidden {
+      display: none;
+    }
+    p {
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📖 Story Haven</h1>
+    <p>Discover captivating tales and immerse yourself in worlds of imagination.</p>
+  </header>
+
+  <main>
+    <div id="story-list" class="story-list"></div>
+
+    <div id="story-view" class="hidden"></div>
+
+    <div id="chapter-view" class="hidden"></div>
+  </main>
+
+  <script>
+    let stories = []
+    let currentStory = null
+    let currentChapterIndex = 0
+
+    async function loadStories() {
+      const res = await fetch('stories.json')
+      const data = await res.json()
+      stories = data.stories
+      renderStoryList()
+    }
+
+    function renderStoryList() {
+      document.getElementById('story-list').innerHTML = ''
+      document.getElementById('story-view').classList.add('hidden')
+      document.getElementById('chapter-view').classList.add('hidden')
+
+      stories.forEach(story => {
+        const card = document.createElement('div')
+        card.className = 'card'
+        card.innerHTML = `
+          <h2>${story.title || story.name || 'Untitled'}</h2>
+          <p><span class="badge">${story.type === 'series' ? 'Series' : 'Standalone'}</span>
+          ${story.author || story.creator ? `by ${story.author || story.creator}` : ''}</p>
+          <p>${story.description || story.summary || ''}</p>
+        `
+        card.onclick = () => viewStory(story)
+        document.getElementById('story-list').appendChild(card)
+      })
+    }
+
+    function viewStory(story) {
+      currentStory = story
+      document.getElementById('story-list').classList.add('hidden')
+      const view = document.getElementById('story-view')
+      view.classList.remove('hidden')
+
+      if (story.type === 'series') {
+        view.innerHTML = `
+          <h2>${story.title || story.name}</h2>
+          <p><span class="badge">Series</span> ${story.author || story.creator ? `by ${story.author || story.creator}` : ''}</p>
+          <p>${story.description || story.summary || ''}</p>
+          <h3>Chapters:</h3>
+          <div id="chapters"></div>
+          <button onclick="goBack()">⬅ Back</button>
+        `
+        const chaptersDiv = document.getElementById('chapters')
+        story.chapters.forEach((ch, index) => {
+          const div = document.createElement('div')
+          div.className = 'chapter'
+          div.textContent = `Chapter ${ch.chapterNumber}: ${ch.title}`
+          div.onclick = () => viewChapter(index)
+          chaptersDiv.appendChild(div)
+        })
+      } else {
+        view.innerHTML = `
+          <h2>${story.title || story.name}</h2>
+          <p><span class="badge">Standalone</span> ${story.author || story.creator ? `by ${story.author || story.creator}` : ''}</p>
+          <p><em>${story.description || story.summary || ''}</em></p>
+          <div>${formatContent(story.content)}</div>
+          <button onclick="goBack()">⬅ Back</button>
+        `
+      }
+    }
+
+    function viewChapter(index) {
+      currentChapterIndex = index
+      const chapter = currentStory.chapters[index]
+      const view = document.getElementById('chapter-view')
+      view.classList.remove('hidden')
+      document.getElementById('story-view').classList.add('hidden')
+
+      view.innerHTML = `
+        <h2>${chapter.title}</h2>
+        <p><em>${chapter.subtitle || ''}</em></p>
+        <div>${formatContent(chapter.content)}</div>
+        <div class="nav-buttons">
+          <button onclick="navigateChapter(-1)" ${index === 0 ? 'disabled' : ''}>⬅ Previous</button>
+          <button onclick="navigateChapter(1)" ${index === currentStory.chapters.length - 1 ? 'disabled' : ''}>Next ➡</button>
+        </div>
+        <button onclick="backToChapters()">🔙 Back to Chapters</button>
+      `
+    }
+
+    function navigateChapter(direction) {
+      const newIndex = currentChapterIndex + direction
+      if (newIndex >= 0 && newIndex < currentStory.chapters.length) {
+        viewChapter(newIndex)
+      }
+    }
+
+    function backToChapters() {
+      document.getElementById('chapter-view').classList.add('hidden')
+      document.getElementById('story-view').classList.remove('hidden')
+    }
+
+    function goBack() {
+      document.getElementById('story-list').classList.remove('hidden')
+      document.getElementById('story-view').classList.add('hidden')
+      document.getElementById('chapter-view').classList.add('hidden')
+    }
+
+    function formatContent(text) {
+      return text.split('\n').map(p => `<p>${p}</p>`).join('')
+    }
+
+    loadStories()
+  </script>
+</body>
+</html>
